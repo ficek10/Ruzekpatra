@@ -5,10 +5,147 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Plánovač služeb</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
-    <link href="styles.css" rel="stylesheet">
+    <style>
+        .table-container {
+            position: relative;
+            width: 100%;
+            overflow-x: auto;
+            margin-top: 20px;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        .shift-cell {
+            padding: 2px !important;
+            min-width: 50px !important;
+            width: 50px !important;
+            border: 1px solid #e5e7eb;
+        }
+
+        .fixed-column {
+            position: sticky;
+            left: 0;
+            background-color: #f8fafc;
+            z-index: 10;
+            min-width: 180px;
+            width: 180px;
+            border-right: 2px solid #e5e7eb;
+        }
+
+        .employee-name {
+            font-weight: 500;
+            padding: 8px;
+            min-width: 180px;
+            width: 180px;
+            background-color: #f8fafc;
+            position: sticky;
+            left: 0;
+            z-index: 10;
+            border-right: 2px solid #e5e7eb;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        thead th {
+            position: sticky;
+            top: 0;
+            background-color: #f3f4f6;
+            z-index: 20;
+            padding: 8px;
+            text-align: center;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        thead th.fixed-column {
+            z-index: 30;
+        }
+
+        .shift-select {
+            width: 100% !important;
+            padding: 2px;
+            font-size: 0.875rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.25rem;
+            appearance: none;
+            -webkit-appearance: none;
+            background-color: transparent;
+            text-align: center;
+            cursor: pointer;
+        }
+
+        .shift-select:hover {
+            border-color: #a0aec0;
+        }
+
+        .shift-select option {
+            background-color: white;
+        }
+
+        .weekend {
+            background-color: #fffde7 !important;
+        }
+
+        /* Barvy pro typy služeb */
+        .shift-R { background-color: rgb(173,216,230); }
+        .shift-O { background-color: rgb(144,238,144); }
+        .shift-L { background-color: rgb(255,182,193); }
+        .shift-IP { background-color: rgb(255,218,185); }
+        .shift-RO { background-color: rgb(221,160,221); }
+        .shift-NSK { background-color: rgb(255,255,153); }
+        .shift-CH { background-color: rgb(255,160,122); }
+        .shift-V { background-color: rgb(211,211,211); }
+        .shift-N { background-color: rgb(176,196,222); }
+        .shift-S { background-color: rgb(152,251,152); }
+        .shift-D { background-color: rgb(240,230,140); }
+        .shift-IV { background-color: rgb(230,230,250); }
+        .shift-SK { background-color: rgb(255,228,196); }
+
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .stats-card {
+            background: white;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        @media (max-width: 768px) {
+            .grid-cols-4 {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .grid-cols-2 {
+                grid-template-columns: 1fr;
+            }
+            
+            .shift-cell {
+                min-width: 40px !important;
+                width: 40px !important;
+            }
+            
+            .shift-select {
+                width: 40px !important;
+                font-size: 0.875rem;
+            }
+            
+            .employee-name {
+                min-width: 150px;
+                width: 150px;
+            }
+        }
+    </style>
 </head>
 <body class="bg-gray-100 p-4">
-    <div class="max-w-full bg-white rounded-lg shadow p-6">
+    <div class="max-w-full mx-auto bg-white rounded-lg shadow p-6">
         <!-- Hlavička -->
         <div class="flex justify-between items-center mb-4">
             <h1 class="text-2xl font-bold">Plánovač služeb</h1>
@@ -20,10 +157,10 @@
 
         <!-- Tabulka s fixním sloupcem -->
         <div class="table-container">
-            <table id="shiftTable">
+            <table id="shiftTable" class="w-full">
                 <thead>
                     <tr>
-                        <th class="fixed-column">Jméno</th>
+                        <th class="fixed-column bg-gray-50">Jméno</th>
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -31,7 +168,7 @@
         </div>
 
         <!-- Tlačítka -->
-        <div class="mt-6 flex gap-4">
+        <div class="mt-6 flex flex-wrap gap-4">
             <button onclick="checkRules()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
                 Kontrola pravidel
             </button>
@@ -60,7 +197,7 @@
         <!-- Legenda -->
         <div class="mt-6 p-4 bg-gray-50 rounded-lg">
             <h3 class="font-bold mb-2">Typy služeb:</h3>
-            <div id="legend" class="grid grid-cols-4 gap-4"></div>
+            <div id="legend" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
         </div>
     </div>
 

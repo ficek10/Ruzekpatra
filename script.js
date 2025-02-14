@@ -25,8 +25,7 @@ const shiftTypes = {
     'N': { name: 'Noční', color: 'rgb(176,196,222)', hours: 9 },
     'S': { name: 'Služba', color: 'rgb(152,251,152)', hours: 7.5 },
     'D': { name: 'Dovolená', color: 'rgb(240,230,140)', hours: 7.5 },
-    'IV': { name: 'Individuální výchova', color: 'rgb(230,230,250)',
-           'IV': { name: 'Individuální výchova', color: 'rgb(230,230,250)', hours: 7.5 },
+    'IV': { name: 'Individuální výchova', color: 'rgb(230,230,250)', hours: 7.5 },
     'ŠK': { name: 'Školení', color: 'rgb(255,228,196)', hours: 7.5 }
 };
 

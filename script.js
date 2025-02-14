@@ -33,14 +33,26 @@ let shifts = {};
 let currentMonth = new Date().getMonth() + 1;
 let currentYear = new Date().getFullYear();
 
-// Inicializace aplikace
+// Inicializace aplikace - rozdělení pro různé stránky
 document.addEventListener('DOMContentLoaded', () => {
-    initializeMonthYearSelects();
-    createShiftTable();
-    createLegend();
+    // Načtení uložených pravidel pro obě stránky
     loadSavedRules();
-    updateTable();
+
+    // Zjištění, na které stránce jsme
+    const isRulesPage = window.location.pathname.includes('rules.html');
+    
+    if (isRulesPage) {
+        // Inicializace stránky s pravidly
+        generateEmployeeCards();
+    } else {
+        // Inicializace hlavní stránky s rozpisem
+        initializeMonthYearSelects();
+        createShiftTable();
+        createLegend();
+        updateTable();
+    }
 });
+
 
 // Inicializace výběru měsíce a roku
 function initializeMonthYearSelects() {

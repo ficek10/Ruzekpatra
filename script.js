@@ -19,10 +19,12 @@ const shiftTypes = {
     'L': { name: 'Lékař', color: 'rgb(255,182,193)', hours: 7.5 },
     'IP': { name: 'Individuální péče', color: 'rgb(255,218,185)', hours: 7.5 },
     'RO': { name: 'Ranní+Odpolední', color: 'rgb(221,160,221)', hours: 11.5 },
-    'NSK': { name: 'Noční služba staniční', color: 'rgb(255,255,153)', hours: 12 },
+    'NSK': { name: 'Noční služba staniční', color: 'rgb(255,255,153)', 
+           hours: 12, nightStart: 19, nightEnd: 7 },
     'CH': { name: 'Chráněné bydlení', color: 'rgb(255,160,122)', hours: 7.5 },
     'V': { name: 'Volno', color: 'rgb(211,211,211)', hours: 0 },
-    'N': { name: 'Noční', color: 'rgb(176,196,222)', hours: 9 },
+    'N': { name: 'Noční', color: 'rgb(176,196,222)', 
+           hours: 9, nightStart: 21, nightEnd: 6 },
     'S': { name: 'Služba', color: 'rgb(152,251,152)', hours: 7.5 },
     'D': { name: 'Dovolená', color: 'rgb(240,230,140)', hours: 7.5 },
     'IV': { name: 'Individuální výchova', color: 'rgb(230,230,250)', hours: 7.5 },
@@ -35,8 +37,8 @@ let currentYear = new Date().getFullYear();
 
 // Inicializace aplikace - rozdělení pro různé stránky
 document.addEventListener('DOMContentLoaded', () => {
-    // Načtení uložených pravidel pro obě stránky
-    loadSavedRules();
+    // Načtení uložených dat
+    loadSavedData();
 
     // Zjištění, na které stránce jsme
     const isRulesPage = window.location.pathname.includes('rules.html');
@@ -53,11 +55,49 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// Ukládání a načítání dat
+function saveShifts() {
+    localStorage.setItem('shifts', JSON.stringify(shifts));
+    localStorage.setItem('currentMonth', currentMonth);
+    localStorage.setItem('currentYear', currentYear);
+}
+
+function loadSavedData() {
+    // Načtení směn
+    const savedShifts = localStorage.getItem('shifts');
+    if (savedShifts) {
+        shifts = JSON.parse(savedShifts);
+    }
+
+    // Načtení aktuálního měsíce a roku
+    const savedMonth = localStorage.getItem('currentMonth');
+    const savedYear = localStorage.getItem('currentYear');
+    if (savedMonth && savedYear) {
+        currentMonth = parseInt(savedMonth);
+        currentYear = parseInt(savedYear);
+    }
+
+    // Načtení pravidel
+    const savedRules = localStorage.getItem('employeeRules');
+    if (savedRules) {
+        const parsedRules = JSON.parse(savedRules);
+        Object.keys(employees).forEach(name => {
+            if (parsedRules[name]) {
+                employees[name] = {
+                    ...employees[name],
+                    ...parsedRules[name]
+                };
+            }
+        });
+    }
+}
 
 // Inicializace výběru měsíce a roku
 function initializeMonthYearSelects() {
     const monthSelect = document.getElementById('monthSelect');
     const yearSelect = document.getElementById('yearSelect');
+
+    if (!monthSelect || !yearSelect) return;
 
     // Měsíce
     for (let i = 1; i <= 12; i++) {
@@ -82,17 +122,21 @@ function initializeMonthYearSelects() {
     monthSelect.addEventListener('change', (e) => {
         currentMonth = parseInt(e.target.value);
         updateTable();
+        saveShifts();
     });
 
     yearSelect.addEventListener('change', (e) => {
         currentYear = parseInt(e.target.value);
         updateTable();
+        saveShifts();
     });
 }
 
 // Vytvoření tabulky služeb
 function createShiftTable() {
     const table = document.getElementById('shiftTable');
+    if (!table) return;
+
     const tbody = table.querySelector('tbody');
     tbody.innerHTML = '';
 
@@ -112,6 +156,8 @@ function createShiftTable() {
 // Aktualizace tabulky
 function updateTable() {
     const table = document.getElementById('shiftTable');
+    if (!table) return;
+
     const thead = table.querySelector('thead tr');
     const tbody = table.querySelector('tbody');
 
@@ -175,6 +221,7 @@ function updateTable() {
                     delete shifts[`${employee}-${i}`];
                     e.target.style.backgroundColor = '';
                 }
+                saveShifts();
                 calculateStats();
             });
 
@@ -184,6 +231,43 @@ function updateTable() {
     });
 
     calculateStats();
+}
+
+// Pomocné funkce pro práci s časem a daty
+function isWeekend(day) {
+    const date = new Date(currentYear, currentMonth - 1, day);
+    return date.getDay() === 0 || date.getDay() === 6;
+}
+
+function getFridayHours(shift) {
+    if (!shift) return 0;
+    const shiftInfo = shiftTypes[shift];
+    if (!shiftInfo.nightStart) return 0;
+    
+    // Pro noční směny počítáme jen hodiny po půlnoci
+    const hoursAfterMidnight = shiftInfo.nightEnd;
+    return hoursAfterMidnight;
+}
+
+function getSundayHours(shift) {
+    if (!shift) return 0;
+    const shiftInfo = shiftTypes[shift];
+    if (!shiftInfo.nightStart) return 0;
+    
+    // Pro noční směny počítáme jen hodiny před půlnocí
+    const hoursBeforeMidnight = 24 - shiftInfo.nightStart;
+    return hoursBeforeMidnight;
+}
+
+function getWorkDays() {
+    const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+    let workDays = 0;
+    for (let day = 1; day <= daysInMonth; day++) {
+        if (!isWeekend(day)) {
+            workDays++;
+        }
+    }
+    return workDays;
 }
 
 // Kontrola pravidel
@@ -247,7 +331,6 @@ function checkRules() {
 
         // Speciální pravidla pro Vaněčkovou
         if (rules.specialRules) {
-            // Kontrola NSK služeb
             const allowedNskDays = [2, 3, 8, 13];
             for (let day = 1; day <= daysInMonth; day++) {
                 if (shifts[`${name}-${day}`] === 'NSK' && !allowedNskDays.includes(day)) {
@@ -338,9 +421,19 @@ function calculateStats() {
             const shift = shifts[`${name}-${day}`];
             if (shift && shiftTypes[shift]) {
                 shiftCounts[shift]++;
-                const hours = shiftTypes[shift].hours;
-                totalHours += hours;
+                let hours = shiftTypes[shift].hours;
 
+                // Speciální výpočet pro noční směny o víkendu
+                if ((shift === 'N' || shift === 'NSK') && isWeekend(day)) {
+                    const date = new Date(currentYear, currentMonth - 1, day);
+                    if (date.getDay() === 5) { // Pátek
+                        hours = getFridayHours(shift);
+                    } else if (date.getDay() === 0) { // Neděle
+                        hours = getSundayHours(shift);
+                    }
+                }
+
+                totalHours += hours;
                 if (isWeekend(day)) {
                     weekendHours += hours;
                 }
@@ -357,6 +450,79 @@ function calculateStats() {
     });
 
     updateStatsDisplay(stats);
+}
+
+// Zobrazení statistik
+function updateStatsDisplay(stats) {
+    const statsDiv = document.getElementById('stats');
+    if (!statsDiv) return;
+
+    statsDiv.innerHTML = '';
+    statsDiv.classList.remove('hidden');
+
+    Object.entries(stats).forEach(([name, stat]) => {
+        const employeeStats = document.createElement('div');
+        employeeStats.className = 'stats-card';
+        employeeStats.innerHTML = `
+            <h4 class="font-semibold">${name}</h4>
+            <div class="grid grid-cols-2 gap-2 mt-2">
+                <div>
+                    <p>Celkem hodin: ${stat.totalHours.toFixed(1)}</p>
+                    <p>Fond pracovní doby: ${stat.fundHours.toFixed(1)}</p>
+                    <p class="${stat.overtime >= 0 ? 'text-green-600' : 'text-red-600'}">
+                        Přesčas: ${stat.overtime.toFixed(1)}
+                    </p>
+                    <p>Víkendové hodiny: ${stat.weekendHours.toFixed(1)}</p>
+                </div>
+                <div>
+                    <p class="font-semibold">Počty služeb:</p>
+                    ${Object.entries(stat.shiftCounts)
+                        .filter(([_, count]) => count > 0)
+                        .map(([type, count]) => `
+                            <p>${type}: ${count}</p>
+                        `).join('')}
+                </div>
+            </div>
+        `;
+        statsDiv.appendChild(employeeStats);
+    });
+}
+
+// Zobrazení výstrah
+function showAlerts(alerts) {
+    const alertsDiv = document.getElementById('alerts');
+    const alertsList = document.getElementById('alertsList');
+    if (!alertsDiv || !alertsList) return;
+
+    alertsList.innerHTML = '';
+
+    if (alerts.length > 0) {
+        alerts.forEach(alert => {
+            const li = document.createElement('li');
+            li.textContent = alert;
+            alertsList.appendChild(li);
+        });
+        alertsDiv.classList.remove('hidden');
+    } else {
+        alertsDiv.classList.add('hidden');
+        alert('Všechna pravidla jsou splněna.');
+    }
+}
+
+// Vytvoření legendy
+function createLegend() {
+    const legend = document.getElementById('legend');
+    if (!legend) return;
+
+    Object.entries(shiftTypes).forEach(([code, {name, color, hours}]) => {
+        const div = document.createElement('div');
+        div.className = 'flex items-center';
+        div.innerHTML = `
+            <div class="w-6 h-6 rounded mr-2" style="background-color: ${color}"></div>
+            <span>${code} - ${name} (${hours}h)</span>
+        `;
+        legend.appendChild(div);
+    });
 }
 
 // Export do Wordu
@@ -446,7 +612,7 @@ function exportToWord() {
             <tr>
                 <td>${name}</td>
                 <td>${stat.totalHours.toFixed(1)}</td>
-<td>${stat.fundHours.toFixed(1)}</td>
+                <td>${stat.fundHours.toFixed(1)}</td>
                 <td>${stat.overtime.toFixed(1)}</td>
                 <td>${stat.weekendHours.toFixed(1)}</td>
             </tr>
@@ -471,91 +637,53 @@ function exportToWord() {
     URL.revokeObjectURL(url);
 }
 
-// Pomocné funkce
-function isWeekend(day) {
-    const date = new Date(currentYear, currentMonth - 1, day);
-    return date.getDay() === 0 || date.getDay() === 6;
-}
-
-function getWorkDays() {
+// Pomocná funkce pro export statistik
+function calculateExportStats() {
+    const stats = {};
     const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
-    let workDays = 0;
-    for (let day = 1; day <= daysInMonth; day++) {
-        if (!isWeekend(day)) {
-            workDays++;
+    const workDays = getWorkDays();
+
+    Object.keys(employees).forEach(name => {
+        let totalHours = 0;
+        let weekendHours = 0;
+
+        for (let day = 1; day <= daysInMonth; day++) {
+            const shift = shifts[`${name}-${day}`];
+            if (shift && shiftTypes[shift]) {
+                let hours = shiftTypes[shift].hours;
+                
+                // Speciální výpočet pro noční směny o víkendu
+                if ((shift === 'N' || shift === 'NSK') && isWeekend(day)) {
+                    const date = new Date(currentYear, currentMonth - 1, day);
+                    if (date.getDay() === 5) { // Pátek
+                        hours = getFridayHours(shift);
+                    } else if (date.getDay() === 0) { // Neděle
+                        hours = getSundayHours(shift);
+                    }
+                }
+
+                totalHours += hours;
+                if (isWeekend(day)) {
+                    weekendHours += hours;
+                }
+            }
         }
-    }
-    return workDays;
-}
 
-function showAlerts(alerts) {
-    const alertsDiv = document.getElementById('alerts');
-    const alertsList = document.getElementById('alertsList');
-    alertsList.innerHTML = '';
-
-    if (alerts.length > 0) {
-        alerts.forEach(alert => {
-            const li = document.createElement('li');
-            li.textContent = alert;
-            alertsList.appendChild(li);
-        });
-        alertsDiv.classList.remove('hidden');
-    } else {
-        alertsDiv.classList.add('hidden');
-        alert('Všechna pravidla jsou splněna.');
-    }
-}
-
-function updateStatsDisplay(stats) {
-    const statsDiv = document.getElementById('stats');
-    statsDiv.innerHTML = '';
-    statsDiv.classList.remove('hidden');
-
-    Object.entries(stats).forEach(([name, stat]) => {
-        const employeeStats = document.createElement('div');
-        employeeStats.className = 'stats-card';
-        employeeStats.innerHTML = `
-            <h4 class="font-semibold">${name}</h4>
-            <div class="grid grid-cols-2 gap-2 mt-2">
-                <div>
-                    <p>Celkem hodin: ${stat.totalHours.toFixed(1)}</p>
-                    <p>Fond pracovní doby: ${stat.fundHours.toFixed(1)}</p>
-                    <p class="${stat.overtime >= 0 ? 'text-green-600' : 'text-red-600'}">
-                        Přesčas: ${stat.overtime.toFixed(1)}
-                    </p>
-                    <p>Víkendové hodiny: ${stat.weekendHours.toFixed(1)}</p>
-                </div>
-                <div>
-                    <p class="font-semibold">Počty služeb:</p>
-                    ${Object.entries(stat.shiftCounts)
-                        .filter(([_, count]) => count > 0)
-                        .map(([type, count]) => `
-                            <p>${type}: ${count}</p>
-                        `).join('')}
-                </div>
-            </div>
-        `;
-        statsDiv.appendChild(employeeStats);
+        stats[name] = {
+            totalHours,
+            weekendHours,
+            fundHours: workDays * 7.5,
+            overtime: totalHours - (workDays * 7.5)
+        };
     });
+
+    return stats;
 }
 
-function createLegend() {
-    const legend = document.getElementById('legend');
-    Object.entries(shiftTypes).forEach(([code, {name, color, hours}]) => {
-        const div = document.createElement('div');
-        div.className = 'flex items-center';
-        div.innerHTML = `
-            <div class="w-6 h-6 rounded mr-2" style="background-color: ${color}"></div>
-            <span>${code} - ${name} (${hours}h)</span>
-        `;
-        legend.appendChild(div);
-    });
-}
-
-// Funkce pro stránku s pravidly
+// Funkce pro generování karet s pravidly (pouze pro rules.html)
 function generateEmployeeCards() {
     const container = document.querySelector('.grid');
-    if (!container) return; // Jsme na stránce s pravidly?
+    if (!container) return;
 
     Object.entries(employees).forEach(([name, rules]) => {
         if (rules.isFloor) return; // Přeskočit kartu pro Růžek Přízemí
@@ -616,7 +744,7 @@ function generateEmployeeCards() {
 function saveAllRules() {
     const updatedRules = {};
     
-    // Sběr všech pravidel zaměstnanců
+// Sběr všech pravidel zaměstnanců
     document.querySelectorAll('input[data-employee]').forEach(input => {
         const name = input.dataset.employee;
         const rule = input.dataset.rule;
@@ -640,69 +768,4 @@ function saveAllRules() {
     localStorage.setItem('generalRules', JSON.stringify(generalRules));
 
     alert('Pravidla byla úspěšně uložena');
-}
-
-// Načtení uložených pravidel
-function loadSavedRules() {
-    const savedRules = localStorage.getItem('employeeRules');
-    if (savedRules) {
-        const parsedRules = JSON.parse(savedRules);
-        Object.keys(employees).forEach(name => {
-            if (parsedRules[name]) {
-                employees[name] = {
-                    ...employees[name],
-                    ...parsedRules[name]
-                };
-            }
-        });
-    }
-
-    // Načtení obecných pravidel na stránce s pravidly
-    const savedGeneralRules = localStorage.getItem('generalRules');
-    if (savedGeneralRules && document.getElementById('minDayStaff')) {
-        const rules = JSON.parse(savedGeneralRules);
-        document.getElementById('minDayStaff').value = rules.minDayStaff;
-        document.getElementById('minNightStaff').value = rules.minNightStaff;
-        document.getElementById('maxConsecutiveShifts').value = rules.maxConsecutiveShifts;
-    }
-}
-
-// Pomocná funkce pro export statistik
-function calculateExportStats() {
-    const stats = {};
-    const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
-    const workDays = getWorkDays();
-
-    Object.keys(employees).forEach(name => {
-        let totalHours = 0;
-        let weekendHours = 0;
-
-        for (let day = 1; day <= daysInMonth; day++) {
-            const shift = shifts[`${name}-${day}`];
-            if (shift && shiftTypes[shift]) {
-                const hours = shiftTypes[shift].hours;
-                totalHours += hours;
-                if (isWeekend(day)) {
-                    weekendHours += hours;
-                }
-            }
-        }
-
-        stats[name] = {
-            totalHours,
-            weekendHours,
-            fundHours: workDays * 7.5,
-            overtime: totalHours - (workDays * 7.5)
-        };
-    });
-
-    return stats;
-}
-
-// Inicializace stránky s pravidly
-if (document.querySelector('.grid')) {
-    document.addEventListener('DOMContentLoaded', () => {
-        loadSavedRules();
-        generateEmployeeCards();
-    });
 }
